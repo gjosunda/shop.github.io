@@ -1,0 +1,1425 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sverigehandel – kalkulator</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #111a2c;
+      --accent: #5dd0ff;
+      --muted: #9fb0c3;
+      --text: #eef6ff;
+      --ok: #38d39f;
+      --warn: #ffd166;
+      --border: rgba(255,255,255,.1);
+    }
+    html,body { margin:0; padding:0; background:linear-gradient(160deg, #0a0f1f 0%, #0b1220 60%, #0e1630 100%); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+    .brand { display:flex; align-items:center; gap:10px; }
+    .logo { width:36px; height:36px; border-radius:12px; background: radial-gradient(circle at 30% 30%, var(--accent), #7ee0ff 35%, #2a91ff 70%, #0056b3 100%); box-shadow: 0 10px 30px rgba(93,208,255,.35); }
+    h1 { font-size: clamp(22px, 4vw, 32px); margin:0; letter-spacing:.3px; }
+    a.link { color: var(--accent); text-decoration: none; }
+    .sub { color:var(--muted); font-size:14px; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border:1px solid var(--border); border-radius:16px; padding:16px; backdrop-filter: blur(6px); box-shadow: 0 6px 28px rgba(0,0,0,.25); margin-bottom:14px; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    label { color:var(--muted); }
+    input, select { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:var(--text); padding:8px 10px; border-radius:10px; outline:none; }
+    input[type=number] { width: 120px; }
+    table { width:100%; border-collapse: collapse; margin-top:10px; font-size: 14px; }
+    th, td { border: 1px solid rgba(255,255,255,.08); padding: 8px; }
+    th { background: rgba(255,255,255,.06); position: sticky; top: 0; z-index: 1; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.center { text-align: center; }
+    .okbg { background: rgba(56,211,159,.12); }
+    .warnbg { background: rgba(255,209,102,.12); }
+    .btn { appearance:none; border:1px solid rgba(255,255,255,.18); background:rgba(93,208,255,.1); color:var(--text); padding:10px 14px; border-radius:12px; text-decoration:none; font-weight:600; transition:.2s transform, .2s background; }
+    .btn:hover { transform: translateY(-1px); background: rgba(93,208,255,.18); }
+    .muted { color: var(--muted); font-size: 13px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 10px; }
+    @media (min-width: 1100px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .summary { display:flex; gap:18px; flex-wrap:wrap; }
+    .chip { background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius: 12px; padding:8px 12px; }
+    .storepicker { display:flex; gap:10px; align-items:center; }
+    select.store { min-width: 140px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>Sverigehandel – kalkulator</h1>
+          <div class="sub">Sammenlign norske og svenske priser (enhetspris kr/kg eller kr/L)</div>
+        </div>
+      </div>
+      <a class="link" href="index.html">← Til forsiden</a>
+    </header>
+
+    <section class="card grid">
+      <div class="row storepicker">
+        <label for="storeSel">Butikk:</label>
+        <select id="storeSel" class="store">
+          <option value="Alle" selected>Alle</option>
+          <option value="Coop">Coop</option>
+          <option value="Willys">Willys</option>
+          <option value="ICA">ICA</option>
+        </select>
+        <span class="muted">Vis rader for valgt kjede</span>
+      </div>
+      <div class="row">
+        <label for="rate">Valutakurs: 1 SEK = </label>
+        <input id="rate" type="number" step="0.001" value="1.065">
+        <span>NOK</span>
+        <button class="btn" onclick="saveRate()">Lagre kurs</button>
+      </div>
+      <div class="summary">
+        <div class="chip">Totalt (SE, NOK): <strong id="sumSeNok">–</strong></div>
+        <div class="chip">Totalt (NO, NOK): <strong id="sumNoNok">–</strong></div>
+        <div class="chip">Besparelse (NOK): <strong id="saveNok">–</strong></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row" style="justify-content: space-between;">
+        <div class="muted">"Billigere?" blir grønn når Sverige er rimeligst. Filteret påvirker også summeringen.</div>
+        <div class="row">
+          <button class="btn" onclick="addRow()">+ Legg til vare</button>
+          <button class="btn" onclick="exportJson()">Eksporter JSON</button>
+        </div>
+      </div>
+
+      <div style="overflow:auto; max-height: 70vh; border-radius: 12px; margin-top:10px;">
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th>Beskrivelse</th>
+              <th>Enhet</th>
+              <th>Nettovekt (g/ml)</th>
+              <th>SE kjede/butikk</th>
+              <th>SE pris (SEK)</th>
+              <th>NO pris (NOK)</th>
+              <th>SE kr/kg/L</th>
+              <th>SE kr/kg/L (NOK)</th>
+              <th>NO kr/kg/L</th>
+              <th>Billigere i SE?</th>
+              <th>Diff %</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr data-store="Coop">
+  <td><input value="Melk lett 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="20.9"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Melk lett 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value="13.5"></td>
+  <td><input type="number" step="0.01" value="20.9"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Melk lett 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="20.9"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Yoghurt naturell 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="25.0"></td>
+  <td><input type="number" step="0.01" value="39.9"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Yoghurt naturell 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="39.9"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Yoghurt naturell 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="39.9"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Norvegia gulost 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="149.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Norvegia gulost 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="149.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Norvegia gulost 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value="110.0"></td>
+  <td><input type="number" step="0.01" value="149.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Brunost 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="95.0"></td>
+  <td><input type="number" step="0.01" value="109.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Brunost 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="109.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Brunost 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="109.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Smør 500g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="500"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="65.0"></td>
+  <td><input type="number" step="0.01" value="59.9"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Smør 500g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="500"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="59.9"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Smør 500g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="500"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="59.9"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Kaffe filtermalt 500g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="500"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="65.0"></td>
+  <td><input type="number" step="0.01" value="110.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Kaffe filtermalt 500g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="500"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="110.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Kaffe filtermalt 500g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="500"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="110.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Pulverkaffe 200g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="200"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="135.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Pulverkaffe 200g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="200"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="135.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Pulverkaffe 200g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="200"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value="69.0"></td>
+  <td><input type="number" step="0.01" value="135.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Spaghetti 1kg (budsjett)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="18.0"></td>
+  <td><input type="number" step="0.01" value="22.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Spaghetti 1kg (budsjett)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="22.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Spaghetti 1kg (budsjett)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="22.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Pasta penne 1kg (merke)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="24.9"></td>
+  <td><input type="number" step="0.01" value="59.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Pasta penne 1kg (merke)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="59.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Pasta penne 1kg (merke)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="59.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Knekkebrød 300g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="300"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="22.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Knekkebrød 300g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="300"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="22.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Knekkebrød 300g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="300"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value="18.0"></td>
+  <td><input type="number" step="0.01" value="22.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Ris jasmin 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="45.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Ris jasmin 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value="25.0"></td>
+  <td><input type="number" step="0.01" value="45.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Ris jasmin 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="45.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Sukker 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="35.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Sukker 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="35.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Sukker 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value="15.0"></td>
+  <td><input type="number" step="0.01" value="35.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Hvetemel siktet 2kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="2000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="25.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Hvetemel siktet 2kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="2000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value="20.0"></td>
+  <td><input type="number" step="0.01" value="25.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Hvetemel siktet 2kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="2000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="25.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Poteter 2.5kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="2500"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="35.0"></td>
+  <td><input type="number" step="0.01" value="60.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Poteter 2.5kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="2500"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="60.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Poteter 2.5kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="2500"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="60.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Tomater 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="60.0"></td>
+  <td><input type="number" step="0.01" value="50.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Tomater 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="50.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Tomater 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="50.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Bananer 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="32.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Bananer 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="32.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Bananer 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value="22.0"></td>
+  <td><input type="number" step="0.01" value="32.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Agurk 1 stk (~350g)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="350"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="34.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Agurk 1 stk (~350g)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="350"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value="10.0"></td>
+  <td><input type="number" step="0.01" value="34.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Agurk 1 stk (~350g)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="350"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="34.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Appelsinjuice 1.5L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1500"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="47.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Appelsinjuice 1.5L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1500"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="47.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Appelsinjuice 1.5L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1500"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value="25.0"></td>
+  <td><input type="number" step="0.01" value="47.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Eplejuice 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="26.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Eplejuice 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="26.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Eplejuice 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value="17.0"></td>
+  <td><input type="number" step="0.01" value="26.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Rapsolje 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Rapsolje 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value="29.0"></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Rapsolje 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Olivenolje 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="89.0"></td>
+  <td><input type="number" step="0.01" value="119.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Olivenolje 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="119.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Olivenolje 1L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="119.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Ketchup 1kg (≈1L)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Ketchup 1kg (≈1L)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value="25.0"></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Ketchup 1kg (≈1L)"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Majones 0.9L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="900"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Majones 0.9L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="900"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Majones 0.9L"></td>
+  <td><select><option value="g" >g</option><option value="ml" selected>ml</option></select></td>
+  <td><input type="number" value="900"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value="35.0"></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Gulost skivet 450g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="450"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="59.0"></td>
+  <td><input type="number" step="0.01" value="89.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Gulost skivet 450g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="450"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="89.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Gulost skivet 450g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="450"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="89.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Kokt skinke 150g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="150"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="25.0"></td>
+  <td><input type="number" step="0.01" value="37.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Kokt skinke 150g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="150"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="37.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Kokt skinke 150g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="150"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="37.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Kjøttdeig 14% 400g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="400"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="75.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Kjøttdeig 14% 400g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="400"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value="45.0"></td>
+  <td><input type="number" step="0.01" value="75.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Kjøttdeig 14% 400g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="400"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="75.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Kyllingfilet 700g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="700"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="89.0"></td>
+  <td><input type="number" step="0.01" value="125.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Kyllingfilet 700g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="700"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="125.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Kyllingfilet 700g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="700"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="125.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Pølser 600g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="600"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="55.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Pølser 600g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="600"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="55.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Pølser 600g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="600"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value="39.0"></td>
+  <td><input type="number" step="0.01" value="55.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Fiskepinner 450g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="450"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="49.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Fiskepinner 450g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="450"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value="35.0"></td>
+  <td><input type="number" step="0.01" value="49.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Fiskepinner 450g"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="450"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="49.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Laks fersk 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value="149.0"></td>
+  <td><input type="number" step="0.01" value="199.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Laks fersk 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="199.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Laks fersk 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="199.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Coop">
+  <td><input value="Kaffebønner 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Coop"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="249.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="Willys">
+  <td><input value="Kaffebønner 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="Willys"></td>
+  <td><input type="number" step="0.01" value="149.0"></td>
+  <td><input type="number" step="0.01" value="249.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+<tr data-store="ICA">
+  <td><input value="Kaffebønner 1kg"></td>
+  <td><select><option value="g" selected>g</option><option value="ml" >ml</option></select></td>
+  <td><input type="number" value="1000"></td>
+  <td><input value="ICA"></td>
+  <td><input type="number" step="0.01" value=""></td>
+  <td><input type="number" step="0.01" value="249.0"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="num"></td>
+  <td class="center"></td>
+  <td class="num"></td>
+</tr>
+
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    function parseNum(x){
+      if(typeof x === 'number') return x;
+      if(!x) return NaN;
+      const s = String(x).replace(',', '.').replace(/\s+/g, '');
+      const v = parseFloat(s);
+      return isNaN(v) ? NaN : v;
+    }
+    function getRate(){
+      const saved = parseNum(localStorage.getItem('sek_to_nok'));
+      const inp = document.getElementById('rate');
+      if(!isNaN(saved) && saved>0) { inp.value = saved; }
+      return parseNum(inp.value) || 0;
+    }
+    function saveRate(){
+      const v = parseNum(document.getElementById('rate').value);
+      if(!isNaN(v) && v>0) localStorage.setItem('sek_to_nok', String(v));
+      recalc();
+    }
+    function applyFilter(){
+      const choice = document.getElementById('storeSel').value;
+      const rows = document.querySelectorAll('#tbl tbody tr');
+      rows.forEach(tr => {
+        const store = tr.getAttribute('data-store');
+        const show = (choice === 'Alle') || (store === choice);
+        tr.style.display = show ? '' : 'none';
+      });
+      recalc();
+    }
+    function recalc(){
+      const rate = getRate();
+      let sumSeNok = 0;
+      let sumNoNok = 0;
+      const rows = document.querySelectorAll('#tbl tbody tr');
+      rows.forEach(tr => {
+        if (tr.style.display === 'none') return; // only visible rows count
+        const unit = tr.children[1].querySelector('select').value;
+        const size = parseNum(tr.children[2].querySelector('input').value) || 0;
+        const se   = parseNum(tr.children[4].querySelector('input').value) || 0;
+        const no   = parseNum(tr.children[5].querySelector('input').value) || 0;
+        const perFactor = size > 0 ? (1000.0 / size) : 0;
+        const sePerUnitSEK = se * perFactor;
+        const sePerUnitNOK = sePerUnitSEK * rate;
+        const noPerUnitNOK = no * perFactor;
+        tr.children[6].textContent = (se && perFactor) ? sePerUnitSEK.toFixed(2) : '';
+        tr.children[7].textContent = (se && perFactor && rate) ? sePerUnitNOK.toFixed(2) : '';
+        tr.children[8].textContent = (no && perFactor) ? noPerUnitNOK.toFixed(2) : '';
+        if (se && no && perFactor && rate){
+          const cheaper = sePerUnitNOK < noPerUnitNOK;
+          tr.children[9].textContent = cheaper ? "Ja" : "Nei";
+          const diff = (noPerUnitNOK - sePerUnitNOK) / noPerUnitNOK;
+          tr.children[10].textContent = (diff*100).toFixed(1) + "%";
+          tr.classList.remove('okbg','warnbg');
+          tr.classList.add(cheaper ? 'okbg' : 'warnbg');
+        } else {
+          tr.children[9].textContent = '';
+          tr.children[10].textContent = '';
+          tr.classList.remove('okbg','warnbg');
+        }
+        sumSeNok += se * (rate || 0);
+        sumNoNok += no;
+      });
+      document.getElementById('sumSeNok').textContent = sumSeNok ? sumSeNok.toFixed(2) : '–';
+      document.getElementById('sumNoNok').textContent = sumNoNok ? sumNoNok.toFixed(2) : '–';
+      const save = (sumNoNok && sumSeNok) ? (sumNoNok - sumSeNok) : 0;
+      document.getElementById('saveNok').textContent = (sumNoNok && sumSeNok) ? save.toFixed(2) : '–';
+    }
+    function addRow(){
+      const choice = document.getElementById('storeSel').value;
+      const store = (choice === 'Alle') ? '' : choice;
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-store', store || 'Coop');
+      tr.innerHTML = `
+        <td><input></td>
+        <td><select><option value="g" selected>g</option><option value="ml">ml</option></select></td>
+        <td><input type="number" value="1000"></td>
+        <td><input value="${store}"></td>
+        <td><input type="number" step="0.01"></td>
+        <td><input type="number" step="0.01"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="num"></td>
+        <td class="center"></td>
+        <td class="num"></td>
+      `;
+      document.querySelector('#tbl tbody').appendChild(tr);
+      applyFilter();
+    }
+    // Delegated listeners
+    document.getElementById('tbl').addEventListener('input', recalc);
+    document.getElementById('rate').addEventListener('input', recalc);
+    document.getElementById('storeSel').addEventListener('change', applyFilter);
+    // Init
+    applyFilter();
+  </script>
+</body>
+</html>
