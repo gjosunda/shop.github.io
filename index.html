@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sverigehandel – prisverktøy</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: linear-gradient(160deg, #0a0f1f 0%, #101a30 100%);
+      color: #f1f6ff;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      padding: 30px 20px;
+      text-align: center;
+      background: rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    h1 {
+      font-size: clamp(24px, 5vw, 38px);
+      margin: 0;
+      color: #5dd0ff;
+    }
+    p.subtitle {
+      color: #b3c3d8;
+      margin-top: 6px;
+      font-size: 15px;
+    }
+    main {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      display: grid;
+      gap: 24px;
+    }
+    section {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+    h2 {
+      margin-top: 0;
+      color: #5dd0ff;
+    }
+    p, li {
+      color: #c2cde0;
+      line-height: 1.6;
+    }
+    a.button {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 12px 18px;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #5dd0ff, #2a91ff);
+      color: #001021;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    a.button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+    footer {
+      text-align: center;
+      padding: 30px 20px;
+      font-size: 13px;
+      color: #8fa1bb;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sverigehandel – prisverktøy</h1>
+    <p class="subtitle">Sammenlign norske og svenske matvarepriser direkte i butikk eller hjemme</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Start kalkulatoren</h2>
+      <p>Bruk denne versjonen direkte i nettleseren. Den fungerer også uten internett på mobilen.</p>
+      <a href="se-shopping-calculator.html" class="button">Åpne kalkulator</a>
+    </section>
+
+    <section>
+      <h2>2. Last ned Excel-arket</h2>
+      <p>Om du heller vil jobbe i Excel: Arket har samme varer og formler for omregning fra SEK → NOK, samt automatisk utregning av enhetspris og forskjell.</p>
+      <a href="SE-shopping-calculator.xlsx" class="button">Last ned Excel</a>
+    </section>
+
+    <section>
+      <h2>3. Om verktøyet</h2>
+      <ul>
+        <li>30 typiske husholdningsvarer med norske referansepriser.</li>
+        <li>Svenske estimater fra Willys, ICA, Coop og Mathem.</li>
+        <li>Regner automatisk ut pris pr. kg/L og viser hvor det er billigst.</li>
+        <li>Juster valutakurs (standard: 1 SEK = 1.065 NOK).</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Tips i butikken</h2>
+      <ul>
+        <li>Sjekk alltid <strong>enhetspris</strong> – ikke bare pakkepris.</li>
+        <li>Fyll inn svensk pris i kalkulatoren for å se sanntids-sammenligning.</li>
+        <li>Grønn bakgrunn = billigere i Sverige.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2025 Sverigehandel – lokalt verktøy laget for privat bruk.<br>
+    Priser varierer etter kjede, kampanjer og region.</p>
+  </footer>
+</body>
+</html>
